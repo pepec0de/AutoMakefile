@@ -9,119 +9,138 @@
 using namespace std;
 
 bool hasExtension(const char* file, const char* ext) {
-    char extGet[10];
-    bool dotFound = false;
-    int c = 0;
-    for (int i = 0; i < (int)strlen(file); i++) {
-        if (dotFound) {
-            extGet[c] = file[i];
-            c++;
-        }
-        if (file[i] == '.') dotFound = true;
-    }
-    extGet[c] = '\0';
-    bool result = false;
-    if (dotFound) {
-        if (strcmp(extGet, ext) == 0) {
-            result = true;
-        }
-    }
-    return result;
+	char extGet[10];
+	bool dotFound = false;
+	int c = 0;
+	for (int i = 0; i < (int)strlen(file); i++) {
+		if (file[i] == '.') dotFound = true; else continue;
+		if (dotFound) {
+			extGet[c] = file[i];
+			c++;
+		}
+	}
+	extGet[c] = '\0';
+	bool result = false;
+	if (dotFound) {
+		if (strcmp(extGet, ext) == 0) {
+			result = true;
+		}
+	}
+	return result;
 }
 
 void getFilesToCompile(const char* path, vector<string> &sources, vector<string> &headers) {
-    if (auto dir = opendir(path)) {
-        while (auto f = readdir(dir)) {
-            if (!f->d_name) continue;
-            char path1[1000];
-            strcpy(path1, path);
-            strcat(path1, "\\");
-            strcat(path1, f->d_name);
-            if (opendir(path1)) {
-                //cout << "Directory: " << f->d_name << endl;
-                if (strcmp(f->d_name, ".") != 0 && strcmp(f->d_name, "..") != 0) {
-                    //cout << "List of files in: " << f->d_name << endl;
-                    getFilesToCompile(path1, sources, headers);
-                }
-            } else {
-                //cout << "File: " << path << endl;
-                string result = "";
-                if (hasExtension(f->d_name, "cpp")) {
-                    for (char c : f->d_name) {
-                        if (c == '.') break;
-                        result.push_back(c);
-                    }
-                    sources.push_back(result);
-                } else if (hasExtension(f->d_name, "h") || hasExtension(f->d_name, "hpp")) {
-                    for (char c : f->d_name) {
-                        if (c == '.') break;
-                        result.push_back(c);
-                    }
-                    headers.push_back(result);
-                }
-            }
-        }
-        closedir(dir);
-    }
+	if (auto dir = opendir(path)) {
+		while (auto f = readdir(dir)) {
+			if (!f->d_name) continue;
+			char path1[1000];
+			strcpy(path1, path);
+			strcat(path1, "\\");
+			strcat(path1, f->d_name);
+			if (opendir(path1)) {
+				//cout << "Directory: " << f->d_name << endl;
+				if (strcmp(f->d_name, ".") != 0 && strcmp(f->d_name, "..") != 0) {
+					//cout << "List of files in: " << f->d_name << endl;
+					getFilesToCompile(path1, sources, headers);
+				}
+			} else {
+				//cout << "File: " << path << endl;
+				string result = "";
+				if (hasExtension(f->d_name, "cpp")) {
+					for (char c : f->d_name) {
+						if (c == '.') break;
+						result.push_back(c);
+					}
+					sources.push_back(result);
+				} else if (hasExtension(f->d_name, "h") || hasExtension(f->d_name, "hpp")) {
+					for (char c : f->d_name) {
+						if (c == '.') break;
+						result.push_back(c);
+					}
+					headers.push_back(result);
+				}
+			}
+		}
+		closedir(dir);
+	}
 }
 
+string getValueOptionValue(int argc, char **argv, string option) {
+	for (int i = 0; i < argc; i++) {
+		if (strcmp(option.c_str(), argv[i]) == 0) {
+			return string(argv[i+1]);
+			break;
+		}
+	}
+	return "";
+}
 int main(int argc, char **argv) {
-    string path, outputFilename;
+	if (argc >= 3) {
+		string path, outputFilename;
+		path = argv[1];
+		outputFilename = argv[2];
+		
+		string codeExt = "cpp", headerExt = "hpp";
+		string arg = getValueOptionValue(argc, argv, "-ce");
+		if (arg != "") {
+			codeExt = arg;
+		}
 
-    if (argc == 3) {
-        path = argv[1];
-        outputFilename = argv[2];
-    }
+		arg = getValueOptionValue(argc, argv, "-he");
+		if (arg != "") {
+			headerExt = arg;
+		}
 
-    if (argc == 3) {
-        vector<string> sources, headers, classes;
-        getFilesToCompile(path.c_str(), sources, headers);
-        for (string src : sources) {
-            for (string h : headers) {
-                if (src == h) {
-                    classes.push_back(src);
-                    break;
-                }
-            }
-        }
-        
-        for (string str : classes) {
-            cout << str << endl;
-        }
+		vector<string> sources, headers, classes;
+		getFilesToCompile(path.c_str(), sources, headers);
+		for (string src : sources) {
+			for (string h : headers) {
+				if (src == h) {
+					classes.push_back(src);
+					break;
+				}
+			}
+		}
+		
+		cout << "AutoMakefile: List of found classes:\n";
+		for (string str : classes) {
+			cout << str << endl;
+		}
 
-        time_t time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-        ofstream f(outputFilename);
-        f << "# Makefile generated by AutoMakefile at " << ctime(&time) << "\n"
-        << "CC := " << "g++"
-        << "\n\nSRCDIR := " << "src"
-        << "\nINCDIR := " << "include"
-        << "\nBUILDDIR := " << "obj"
-        << "\nOUTPUTDIR := " << "bin"
-        << "\n\nTARGET := $(OUTPUTDIR)\\App.exe"
-        << "\nCFLAGS := " << "-std=c++11 -Wall -Weffc++ -pedantic"
-        << "\n\nall: $(TARGET)"
-        << "\n\n$(TARGET): $(BUILDDIR)\\main.o";
-        if (classes.size() > 0) {
-            f << "$(BUILDDIR)\\";
-            for (int i = 0; i < classes.size(); i++) {
-                f << classes[i] << (i < classes.size()-1 ? ".o $(BUILDDIR)\\" : ".o\n");
-            }
-        } else f << "\n";
-        f << "\t$(CC) $(CFLAGS) $^ -o $(TARGET)\n\n"
-        << "$(BUILDDIR)\\main.o: main.cpp\n"
-        << "\t$(CC) -c main.cpp -o $(BUILDDIR)\\main.o\n\n";
-        for (string str : classes) {
-            f << "$(BUILDDIR)\\" << str <<".o: $(SRCDIR)\\" << str << ".cpp $(INCDIR)\\" << str << ".h\n"
-            << "\t$(CC) -c $(SRCDIR)\\" << str << ".cpp -o $(BUILDDIR)\\" << str << ".o\n\n";
-        }
+		time_t time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+		cout << "AutoMakefile: Generating Makefile\nWARNING: default header extension \"hpp\"\n";
+		ofstream f(outputFilename);
+		f << "# Makefile generated by AutoMakefile at " << ctime(&time) << "\n"
+		<< "CC := " << "g++"
+		<< "\n\nSRCDIR := " << "src"
+		<< "\nINCDIR := " << "include"
+		<< "\nBUILDDIR := " << "obj"
+		<< "\nOUTPUTDIR := " << "bin"
+		<< "\n\nTARGET := $(OUTPUTDIR)\\App.exe"
+		<< "\nCFLAGS := " << "-std=c++11 -Wall -Weffc++ -pedantic"
+		<< "\n\nall: $(TARGET)"
+		<< "\n\n$(TARGET): $(BUILDDIR)\\main.o ";
+		if (classes.size() > 0) {
+			f << "$(BUILDDIR)\\";
+			for (int i = 0; i < classes.size(); i++) {
+				f << classes[i] << (i < classes.size()-1 ? ".o $(BUILDDIR)\\" : ".o\n");
+			}
+		} else f << "\n";
+		f << "\t$(CC) $(CFLAGS) $^ -o $(TARGET)\n\n"
+		<< "$(BUILDDIR)\\main.o: main." << codeExt << "\n"
+		<< "\t$(CC) -c main." << codeExt << " -o $(BUILDDIR)\\main.o \n\n";
+		for (string str : classes) {
+			f << "$(BUILDDIR)\\" << str <<".o: $(SRCDIR)\\" << str << "." << codeExt << " $(INCDIR)\\" << str << "." << headerExt << "\n"
+			<< "\t$(CC) -c $(SRCDIR)\\" << str << "." << codeExt << " -o $(BUILDDIR)\\" << str << ".o\n\n";
+		}
 
-        f << "clean:\n"
-        << "\t@erase $(BUILDDIR)\\*.o\n"
-        << "\t@erase $(TARGET)\n";
-        f.close();
-    } else {
-        cout << "AutoMakefile: invalid args!\n";
-        cout << "\tUse: automakefile.exe <path> <outputfile>\n";
-    }
+		f << "clean:\n"
+		<< "\t@erase $(BUILDDIR)\\*.o\n"
+		<< "\t@erase $(TARGET)\n";
+		f.close();
+	} else {
+		cout << "AutoMakefile: invalid args!\n";
+		cout << "\tUse: automakefile.exe <path> <outputfile> (option)[FILE EXTENSIONS] -he hpp -ce cpp\n";
+	}
 	return 0;
 }
